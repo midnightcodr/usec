@@ -102,7 +102,7 @@ pub fn generate_calendars() -> BTreeMap<String, Calendar> {
         },
         Holiday::SingularDay(NaiveDate::from_ymd(2001, 9, 11)),
     ];
-    let target_cal = Calendar::calc_calendar(&target_holidays, 2021, 2050);
+    let target_cal = Calendar::calc_calendar(&target_holidays, 2000, 2050);
     calendars.insert("US_EXCHANGES".to_string(), target_cal);
 
     calendars

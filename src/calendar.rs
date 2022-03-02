@@ -53,6 +53,7 @@ pub enum Holiday {
 #[derive(Debug, Clone)]
 pub struct Calendar {
     holidays: BTreeSet<NaiveDate>,
+    halfdays: BTreeSet<NaiveDate>,
     weekdays: Vec<Weekday>,
 }
 
@@ -62,6 +63,7 @@ impl Calendar {
     /// of a vector of holiday rules.
     pub fn calc_calendar(holiday_rules: &[Holiday], start: i32, end: i32) -> Calendar {
         let mut holidays = BTreeSet::new();
+        let mut halfdays = BTreeSet::new();
         let mut weekdays = Vec::new();
 
         for rule in holiday_rules {
@@ -75,6 +77,7 @@ impl Calendar {
                 Holiday::WeekDay(weekday) => {
                     weekdays.push(*weekday);
                 }
+                // prior to 7/4 and 12/25, if
                 Holiday::MovableYearlyDay {
                     month,
                     day,
@@ -85,15 +88,17 @@ impl Calendar {
                     for year in first..last + 1 {
                         let date = NaiveDate::from_ymd(year, *month, *day);
                         // if date falls on Saturday, use Friday, if date falls on Sunday, use Monday
-                        let date = match date.weekday() {
+                        let orig_wd = date.weekday();
+                        let date = match orig_wd {
                             Weekday::Sat => date.pred(),
                             Weekday::Sun => date.succ(),
                             _ => date,
                         };
+                        let wd = date.weekday();
                         let last_date_of_month = NaiveDate::from_ymd_opt(year, month + 1, 1)
                             .unwrap_or_else(|| NaiveDate::from_ymd(year + 1, 1, 1))
                             .pred();
-                        let yr = if date.weekday() == Weekday::Fri && *month == 1 {
+                        let yr = if wd == Weekday::Fri && *month == 1 {
                             year - 1
                         } else {
                             year
@@ -102,6 +107,12 @@ impl Calendar {
                         // use the date only if it's not the end of a month or a year
                         if date != last_date_of_month && date != last_date_of_year {
                             holidays.insert(date);
+                            // determine half days
+                            if *month == 7 && *day == 4 || *month == 12 && *day == 25 {
+                                if wd != Weekday::Mon {
+                                    halfdays.insert(date.pred());
+                                }
+                            }
                         }
                     }
                 }
@@ -144,11 +155,19 @@ impl Calendar {
                             }
                         }
                         holidays.insert(date);
+                        // Black Friday
+                        if *month == 11 && *weekday == Weekday::Thu && *nth == NthWeek::Fourth {
+                            halfdays.insert(date.succ());
+                        }
                     }
                 }
             }
         }
-        Calendar { holidays, weekdays }
+        Calendar {
+            holidays,
+            halfdays,
+            weekdays,
+        }
     }
 
     /// Calculate the next business day
@@ -197,9 +216,14 @@ impl Calendar {
         false
     }
 
-    /// Returns true if the specified day is a bank holiday
+    /// Returns true if the specified day is a full-day holiday
     pub fn is_holiday(&self, date: NaiveDate) -> bool {
         self.holidays.get(&date).is_some()
+    }
+
+    /// Returns true if the specified day is a half-day holiday
+    pub fn is_half_holiday(&self, date: NaiveDate) -> bool {
+        self.halfdays.get(&date).is_some()
     }
 
     /// Returns true if the specified day is a business day
@@ -246,7 +270,7 @@ impl CalendarProvider for SimpleCalendar {
 impl Default for SimpleCalendar {
     fn default() -> SimpleCalendar {
         SimpleCalendar {
-            cal: Calendar::calc_calendar(&[], 2020, 2021),
+            cal: Calendar::calc_calendar(&[], 2000, 2050),
         }
     }
 }
