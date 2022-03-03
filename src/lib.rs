@@ -1,5 +1,4 @@
 pub mod calendar;
-pub mod market;
 #[cfg(test)]
 mod tests {
     #[test]

@@ -232,12 +232,6 @@ impl Calendar {
     }
 }
 
-pub struct CalendarNotFound {}
-
-pub trait CalendarProvider {
-    fn get_calendar(&self, calendar_name: &str) -> Result<&Calendar, CalendarNotFound>;
-}
-
 /// Returns true if the specified year is a leap year (i.e. Feb 29th exists for this year)
 pub fn is_leap_year(year: i32) -> bool {
     NaiveDate::from_ymd_opt(year, 2, 29).is_some()
@@ -253,25 +247,119 @@ pub fn last_day_of_month(year: i32, month: u32) -> u32 {
 
 pub struct SimpleCalendar {
     cal: Calendar,
+    holiday_rules: Vec<Holiday>,
 }
 
+// NYSE holiday calendar as of 2022
 impl SimpleCalendar {
-    pub fn new(cal: &Calendar) -> SimpleCalendar {
-        SimpleCalendar { cal: cal.clone() }
-    }
-}
-
-impl CalendarProvider for SimpleCalendar {
-    fn get_calendar(&self, _calendar_name: &str) -> Result<&Calendar, CalendarNotFound> {
-        Ok(&self.cal)
-    }
-}
-
-impl Default for SimpleCalendar {
-    fn default() -> SimpleCalendar {
-        SimpleCalendar {
-            cal: Calendar::calc_calendar(&[], 2000, 2050),
+    pub fn with_default_rules(populate: bool) -> SimpleCalendar {
+        let holiday_rules = vec![
+            // Saturdays
+            Holiday::WeekDay(Weekday::Sat),
+            // Sundays
+            Holiday::WeekDay(Weekday::Sun),
+            // New Year's day
+            Holiday::MovableYearlyDay {
+                month: 1,
+                day: 1,
+                first: None,
+                last: None,
+            },
+            // MLK, 3rd Monday of January
+            Holiday::MonthWeekday {
+                month: 1,
+                weekday: Weekday::Mon,
+                nth: NthWeek::Third,
+                first: None,
+                last: None,
+            },
+            // President's Day
+            Holiday::MonthWeekday {
+                month: 2,
+                weekday: Weekday::Mon,
+                nth: NthWeek::Third,
+                first: None,
+                last: None,
+            },
+            // Good Friday
+            Holiday::EasterOffset {
+                offset: -2,
+                first: Some(2000),
+                last: None,
+            },
+            // Memorial Day
+            Holiday::MonthWeekday {
+                month: 5,
+                weekday: Weekday::Mon,
+                nth: NthWeek::Last,
+                first: None,
+                last: None,
+            },
+            // Juneteenth National Independence Day
+            Holiday::MovableYearlyDay {
+                month: 6,
+                day: 19,
+                first: Some(2022),
+                last: None,
+            },
+            // Independence Day
+            Holiday::MovableYearlyDay {
+                month: 7,
+                day: 4,
+                first: None,
+                last: None,
+            },
+            // Labour Day
+            Holiday::MonthWeekday {
+                month: 9,
+                weekday: Weekday::Mon,
+                nth: NthWeek::First,
+                first: None,
+                last: None,
+            },
+            // Thanksgiving Day
+            Holiday::MonthWeekday {
+                month: 11,
+                weekday: Weekday::Thu,
+                nth: NthWeek::Fourth,
+                first: None,
+                last: None,
+            },
+            // Chrismas Day
+            Holiday::MovableYearlyDay {
+                month: 12,
+                day: 25,
+                first: None,
+                last: None,
+            },
+            Holiday::SingularDay(NaiveDate::from_ymd(2001, 9, 11)),
+        ];
+        let cal = Calendar {
+            holidays: BTreeSet::new(),
+            halfdays: BTreeSet::new(),
+            weekdays: Vec::new(),
+        };
+        let mut sc = SimpleCalendar { cal, holiday_rules };
+        if populate {
+            sc.populate_cal(None, None);
         }
+        sc
+    }
+
+    pub fn add_holiday_rule(&mut self, holiday: Holiday) -> &mut Self {
+        self.holiday_rules.push(holiday);
+        self
+    }
+
+    pub fn populate_cal(&mut self, start: Option<i32>, end: Option<i32>) -> &mut Self {
+        let start = start.unwrap_or(2000);
+        let end = end.unwrap_or(2050);
+        self.cal = Calendar::calc_calendar(&self.holiday_rules, start, end);
+        self
+    }
+
+    pub fn get_cal(&self) -> Calendar {
+        self.cal.clone()
     }
 }
 
@@ -433,5 +521,41 @@ mod tests {
         for i in 0..holidays.len() {
             assert_eq!(holidays[i], holidays2[i]);
         }
+    }
+
+    #[test]
+    fn test_simple_calendar_empty() {
+        let sc = SimpleCalendar::with_default_rules(false);
+        let c = sc.get_cal();
+        assert!(c.holidays.len() == 0);
+        assert!(c.halfdays.len() == 0);
+        assert!(c.weekdays.len() == 0);
+    }
+
+    #[test]
+    fn test_simple_calendar_populated() {
+        let sc = SimpleCalendar::with_default_rules(true);
+        let c = sc.get_cal();
+        assert!(c.holidays.len() > 0);
+        assert!(c.halfdays.len() > 0);
+        assert!(c.weekdays.len() > 0);
+        assert!(c.is_holiday(NaiveDate::from_ymd(2021, 1, 1)));
+        assert_eq!(false, c.is_holiday(NaiveDate::from_ymd(2021, 12, 31)))
+    }
+
+    #[test]
+    fn test_simple_calendar_with_new_rule() {
+        // imaginary holiday, let's call it March Madness Day
+        let mut sc = SimpleCalendar::with_default_rules(false);
+        let holiday = Holiday::MonthWeekday {
+            month: 3,
+            weekday: Weekday::Wed,
+            nth: NthWeek::Third,
+            first: None,
+            last: None,
+        };
+        sc.add_holiday_rule(holiday).populate_cal(None, None);
+        let c = sc.get_cal();
+        assert_eq!(true, c.is_holiday(NaiveDate::from_ymd(2022, 3, 16)));
     }
 }
