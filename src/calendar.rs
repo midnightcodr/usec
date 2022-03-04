@@ -13,6 +13,11 @@ pub enum NthWeek {
     Fourth,
     Last,
 }
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
+pub enum HalfCheck {
+    Before,
+    After,
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum Holiday {
@@ -29,6 +34,7 @@ pub enum Holiday {
         day: u32,
         first: Option<i32>,
         last: Option<i32>,
+        half_check: Option<HalfCheck>,
     },
     /// A single holiday which is valid only once in time.
     SingularDay(NaiveDate),
@@ -46,6 +52,7 @@ pub enum Holiday {
         nth: NthWeek,
         first: Option<i32>,
         last: Option<i32>,
+        half_check: Option<HalfCheck>,
     },
 }
 
@@ -83,6 +90,7 @@ impl Calendar {
                     day,
                     first,
                     last,
+                    half_check,
                 } => {
                     let (first, last) = Self::calc_first_and_last(start, end, first, last);
                     for year in first..last + 1 {
@@ -94,25 +102,11 @@ impl Calendar {
                             Weekday::Sun => date.succ(),
                             _ => date,
                         };
-                        let wd = date.weekday();
-                        let last_date_of_month = NaiveDate::from_ymd_opt(year, month + 1, 1)
-                            .unwrap_or_else(|| NaiveDate::from_ymd(year + 1, 1, 1))
-                            .pred();
-                        let yr = if wd == Weekday::Fri && *month == 1 {
-                            year - 1
-                        } else {
-                            year
-                        };
-                        let last_date_of_year = NaiveDate::from_ymd_opt(yr, 12, 31).unwrap();
+                        let (last_date_of_month, last_date_of_year) = accounting_period_end(date);
                         // use the date only if it's not the end of a month or a year
                         if date != last_date_of_month && date != last_date_of_year {
                             holidays.insert(date);
-                            // determine half days
-                            if *month == 7 && *day == 4 || *month == 12 && *day == 25 {
-                                if wd != Weekday::Mon {
-                                    halfdays.insert(date.pred());
-                                }
-                            }
+                            do_halfday_check(&date, &mut halfdays, half_check);
                         }
                     }
                 }
@@ -137,6 +131,7 @@ impl Calendar {
                     nth,
                     first,
                     last,
+                    half_check,
                 } => {
                     let (first, last) = Self::calc_first_and_last(start, end, first, last);
                     for year in first..last + 1 {
@@ -155,10 +150,7 @@ impl Calendar {
                             }
                         }
                         holidays.insert(date);
-                        // Black Friday
-                        if *month == 11 && *weekday == Weekday::Thu && *nth == NthWeek::Fourth {
-                            halfdays.insert(date.succ());
-                        }
+                        do_halfday_check(&date, &mut halfdays, half_check);
                     }
                 }
             }
@@ -237,6 +229,42 @@ pub fn is_leap_year(year: i32) -> bool {
     NaiveDate::from_ymd_opt(year, 2, 29).is_some()
 }
 
+/// Returns accounting period end
+pub fn accounting_period_end(date: NaiveDate) -> (NaiveDate, NaiveDate) {
+    let month = date.month();
+    let year = date.year();
+    let last_date_of_month = NaiveDate::from_ymd_opt(year, month + 1, 1)
+        .unwrap_or_else(|| NaiveDate::from_ymd(year + 1, 1, 1))
+        .pred();
+    let last_date_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
+    return (last_date_of_month, last_date_of_year);
+}
+
+pub fn do_halfday_check(
+    date: &NaiveDate,
+    halfdays: &mut BTreeSet<NaiveDate>,
+    half_check: &Option<HalfCheck>,
+) {
+    let weekday = date.weekday();
+    match half_check {
+        None => {}
+        Some(HalfCheck::Before) => {
+            if weekday == Weekday::Mon {
+                return;
+            }
+            let prior = date.pred();
+            halfdays.insert(prior);
+        }
+        Some(HalfCheck::After) => {
+            if weekday == Weekday::Fri {
+                return;
+            }
+            let next = date.succ();
+            halfdays.insert(next);
+        }
+    }
+}
+
 /// Calculate the last day of a given month in a given year
 pub fn last_day_of_month(year: i32, month: u32) -> u32 {
     NaiveDate::from_ymd_opt(year, month + 1, 1)
@@ -245,14 +273,14 @@ pub fn last_day_of_month(year: i32, month: u32) -> u32 {
         .day()
 }
 
-pub struct SimpleCalendar {
+pub struct UsExchangeCalendar {
     cal: Calendar,
     holiday_rules: Vec<Holiday>,
 }
 
 // NYSE holiday calendar as of 2022
-impl SimpleCalendar {
-    pub fn with_default_rules(populate: bool) -> SimpleCalendar {
+impl UsExchangeCalendar {
+    pub fn with_default_rules(populate: bool) -> UsExchangeCalendar {
         let holiday_rules = vec![
             // Saturdays
             Holiday::WeekDay(Weekday::Sat),
@@ -264,6 +292,7 @@ impl SimpleCalendar {
                 day: 1,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // MLK, 3rd Monday of January
             Holiday::MonthWeekday {
@@ -272,6 +301,7 @@ impl SimpleCalendar {
                 nth: NthWeek::Third,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // President's Day
             Holiday::MonthWeekday {
@@ -280,6 +310,7 @@ impl SimpleCalendar {
                 nth: NthWeek::Third,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // Good Friday
             Holiday::EasterOffset {
@@ -294,6 +325,7 @@ impl SimpleCalendar {
                 nth: NthWeek::Last,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // Juneteenth National Independence Day
             Holiday::MovableYearlyDay {
@@ -301,6 +333,7 @@ impl SimpleCalendar {
                 day: 19,
                 first: Some(2022),
                 last: None,
+                half_check: None,
             },
             // Independence Day
             Holiday::MovableYearlyDay {
@@ -308,6 +341,7 @@ impl SimpleCalendar {
                 day: 4,
                 first: None,
                 last: None,
+                half_check: Some(HalfCheck::Before),
             },
             // Labour Day
             Holiday::MonthWeekday {
@@ -316,6 +350,7 @@ impl SimpleCalendar {
                 nth: NthWeek::First,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // Thanksgiving Day
             Holiday::MonthWeekday {
@@ -324,6 +359,7 @@ impl SimpleCalendar {
                 nth: NthWeek::Fourth,
                 first: None,
                 last: None,
+                half_check: Some(HalfCheck::After),
             },
             // Chrismas Day
             Holiday::MovableYearlyDay {
@@ -331,6 +367,7 @@ impl SimpleCalendar {
                 day: 25,
                 first: None,
                 last: None,
+                half_check: Some(HalfCheck::Before),
             },
             Holiday::SingularDay(NaiveDate::from_ymd(2001, 9, 11)),
         ];
@@ -339,7 +376,7 @@ impl SimpleCalendar {
             halfdays: BTreeSet::new(),
             weekdays: Vec::new(),
         };
-        let mut sc = SimpleCalendar { cal, holiday_rules };
+        let mut sc = UsExchangeCalendar { cal, holiday_rules };
         if populate {
             sc.populate_cal(None, None);
         }
@@ -412,6 +449,7 @@ mod tests {
             day: 1,
             first: None,
             last: None,
+            half_check: None,
         }];
         let cal = Calendar::calc_calendar(&holidays, 2021, 2022);
         assert_eq!(false, cal.is_holiday(NaiveDate::from_ymd(2021, 12, 31)));
@@ -440,6 +478,7 @@ mod tests {
                 nth: NthWeek::Third,
                 first: None,
                 last: None,
+                half_check: None,
             },
             // President's Day
             Holiday::MonthWeekday {
@@ -448,6 +487,7 @@ mod tests {
                 nth: NthWeek::Third,
                 first: None,
                 last: None,
+                half_check: None,
             },
         ];
         let cal = Calendar::calc_calendar(&holidays, 2022, 2022);
@@ -465,12 +505,14 @@ mod tests {
                 nth: NthWeek::First,
                 first: None,
                 last: None,
+                half_check: None,
             },
             Holiday::MovableYearlyDay {
                 month: 11,
                 day: 1,
                 first: Some(2016),
                 last: None,
+                half_check: None,
             },
             Holiday::SingularDay(NaiveDate::from_ymd(2019, 11, 25)),
             Holiday::WeekDay(Weekday::Sat),
@@ -524,8 +566,8 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_calendar_empty() {
-        let sc = SimpleCalendar::with_default_rules(false);
+    fn test_usexchange_calendar_empty() {
+        let sc = UsExchangeCalendar::with_default_rules(false);
         let c = sc.get_cal();
         assert!(c.holidays.len() == 0);
         assert!(c.halfdays.len() == 0);
@@ -533,8 +575,8 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_calendar_populated() {
-        let sc = SimpleCalendar::with_default_rules(true);
+    fn test_usexchange_calendar_populated() {
+        let sc = UsExchangeCalendar::with_default_rules(true);
         let c = sc.get_cal();
         assert!(c.holidays.len() > 0);
         assert!(c.halfdays.len() > 0);
@@ -544,15 +586,16 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_calendar_with_new_rule() {
+    fn test_usexchange_calendar_with_new_rule() {
         // imaginary holiday, let's call it March Madness Day
-        let mut sc = SimpleCalendar::with_default_rules(false);
+        let mut sc = UsExchangeCalendar::with_default_rules(false);
         let holiday = Holiday::MonthWeekday {
             month: 3,
             weekday: Weekday::Wed,
             nth: NthWeek::Third,
             first: None,
             last: None,
+            half_check: None,
         };
         sc.add_holiday_rule(holiday).populate_cal(None, None);
         let c = sc.get_cal();
