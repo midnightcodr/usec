@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Specifies the nth week of a month
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum NthWeek {
     First,
     Second,
@@ -13,13 +13,13 @@ pub enum NthWeek {
     Fourth,
     Last,
 }
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum HalfCheck {
     Before,
     After,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum Holiday {
     /// Though weekends are no holidays, they need to be specified in the calendar. Weekends are assumed to be non-business days.
     /// In most countries, weekends include Saturday (`Sat`) and Sunday (`Sun`). Unfortunately, there are a few exceptions.
@@ -273,6 +273,7 @@ pub fn last_day_of_month(year: i32, month: u32) -> u32 {
         .day()
 }
 
+#[derive(Debug, Clone)]
 pub struct UsExchangeCalendar {
     cal: Calendar,
     holiday_rules: Vec<Holiday>,
