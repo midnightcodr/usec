@@ -405,6 +405,11 @@ impl UsExchangeCalendar {
 mod tests {
     use super::*;
 
+    fn make_cal() -> Calendar {
+        let usec = UsExchangeCalendar::with_default_rules(true);
+        usec.get_cal()
+    }
+
     #[test]
     fn fixed_dates_calendar() {
         let holidays = vec![
@@ -533,7 +538,8 @@ mod tests {
       "weekday": "Mon",
       "nth": "First",
       "first": null,
-      "last": null
+      "last": null,
+      "half_check": null
     }
   },
   {
@@ -541,7 +547,8 @@ mod tests {
       "month": 11,
       "day": 1,
       "first": 2016,
-      "last": null
+      "last": null,
+      "half_check": null
     }
   },
   {
@@ -601,5 +608,47 @@ mod tests {
         sc.add_holiday_rule(holiday).populate_cal(None, None);
         let c = sc.get_cal();
         assert_eq!(true, c.is_holiday(NaiveDate::from_ymd(2022, 3, 16)));
+    }
+
+    #[test]
+    fn test_is_trading_date() {
+        let cal = make_cal();
+        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 4, 18)), false);
+        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 4, 19)), true);
+        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 1, 1)), false);
+    }
+
+    #[test]
+    fn test_prev_bday() {
+        let cal = make_cal();
+        assert_eq!(
+            cal.prev_bday(NaiveDate::from_ymd(2021, 1, 18)),
+            NaiveDate::from_ymd(2021, 1, 15)
+        );
+        assert_eq!(
+            cal.prev_bday(NaiveDate::from_ymd(2021, 4, 19)),
+            NaiveDate::from_ymd(2021, 4, 16)
+        );
+        assert_eq!(
+            cal.prev_bday(NaiveDate::from_ymd(2021, 8, 9)),
+            NaiveDate::from_ymd(2021, 8, 6)
+        );
+    }
+
+    #[test]
+    fn test_next_bday() {
+        let cal = make_cal();
+        assert_eq!(
+            cal.next_bday(NaiveDate::from_ymd(2021, 4, 16)),
+            NaiveDate::from_ymd(2021, 4, 19)
+        );
+        assert_eq!(
+            cal.next_bday(NaiveDate::from_ymd(2021, 4, 19)),
+            NaiveDate::from_ymd(2021, 4, 20)
+        );
+        assert_eq!(
+            cal.next_bday(NaiveDate::from_ymd(2021, 4, 2)),
+            NaiveDate::from_ymd(2021, 4, 5)
+        );
     }
 }
