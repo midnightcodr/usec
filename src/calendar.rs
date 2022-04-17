@@ -279,8 +279,8 @@ pub struct UsExchangeCalendar {
     holiday_rules: Vec<Holiday>,
 }
 
-// NYSE holiday calendar as of 2022
 impl UsExchangeCalendar {
+    /// NYSE holiday calendar as of 2022
     pub fn with_default_rules(populate: bool) -> UsExchangeCalendar {
         let holiday_rules = vec![
             // Saturdays
@@ -384,11 +384,13 @@ impl UsExchangeCalendar {
         sc
     }
 
+    /// add an ad-hoc holiday rule to the rule list
     pub fn add_holiday_rule(&mut self, holiday: Holiday) -> &mut Self {
         self.holiday_rules.push(holiday);
         self
     }
 
+    /// return calendar from `start` and `end` years (inclusively)
     pub fn populate_cal(&mut self, start: Option<i32>, end: Option<i32>) -> &mut Self {
         let start = start.unwrap_or(2000);
         let end = end.unwrap_or(2050);
