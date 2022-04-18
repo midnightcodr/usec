@@ -1,4 +1,6 @@
-//! Implementation of US stock exchange holidays.
+//! Implementation of US stock exchange calendar with full and half-day holidays.
+//! code borrowed heavily from
+//! <https://docs.rs/finql/latest/finql/calendar/struct.Calendar.html>
 
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 use serde::{Deserialize, Serialize};
@@ -21,13 +23,8 @@ pub enum HalfCheck {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum Holiday {
-    /// Though weekends are no holidays, they need to be specified in the calendar. Weekends are assumed to be non-business days.
-    /// In most countries, weekends include Saturday (`Sat`) and Sunday (`Sun`). Unfortunately, there are a few exceptions.
+    /// for US exchanges, `Sat` and `Sun`
     WeekDay(Weekday),
-    /// Occurs every year, but is moved to next non-weekend day if it falls on a weekday.
-    /// Note that Saturday and Sunday here assumed to be weekend days, even if these days
-    /// are not defined as weekends in this calendar. If the next Monday is already a holiday,
-    /// the date will be moved to the next available business day.
     /// `first` and `last` are the first and last year this day is a holiday (inclusively).
     MovableYearlyDay {
         month: u32,
@@ -84,7 +81,7 @@ impl Calendar {
                 Holiday::WeekDay(weekday) => {
                     weekdays.push(*weekday);
                 }
-                // prior to 7/4 and 12/25, if
+                // check if prior to 7/4 and 12/25
                 Holiday::MovableYearlyDay {
                     month,
                     day,
@@ -281,6 +278,8 @@ pub struct UsExchangeCalendar {
 
 // NYSE holiday calendar as of 2022
 impl UsExchangeCalendar {
+    /// create a new US Exchange calendar with default rules, populate the
+    /// calendar with default range (2000-2050) if `populate` is set to `true`
     pub fn with_default_rules(populate: bool) -> UsExchangeCalendar {
         let holiday_rules = vec![
             // Saturdays
@@ -384,11 +383,15 @@ impl UsExchangeCalendar {
         sc
     }
 
+
+    /// add a holiday rule to the calendar
     pub fn add_holiday_rule(&mut self, holiday: Holiday) -> &mut Self {
         self.holiday_rules.push(holiday);
         self
     }
 
+    /// populate calendar for given `start` and `end` years (defaults to 2000 and 2050 if None,
+    /// None are given)
     pub fn populate_cal(&mut self, start: Option<i32>, end: Option<i32>) -> &mut Self {
         let start = start.unwrap_or(2000);
         let end = end.unwrap_or(2050);
