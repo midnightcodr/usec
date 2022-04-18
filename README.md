@@ -1,6 +1,6 @@
 ### About
 
-This is a Rust module with the ability of calculating US stock exchange calendar with full and half-day holidays. I've borrowed code heavily from (https://github.com/xemwebe/cal-calc)[https://github.com/xemwebe/cal-calc], special thanks to https://github.com/xemwebe
+This is a Rust module with the ability of calculating US stock exchange calendar with full and half-day holidays. I've borrowed code heavily from phttps://github.com/xemwebe/cal-calc]( https://github.com/xemwebe/cal-calc), special thanks to https://github.com/xemwebe
 
 
 ### Motivation
