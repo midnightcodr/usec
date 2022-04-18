@@ -1,4 +1,4 @@
-use fin::calendar::UsExchangeCalendar;
+use usec::calendar::UsExchangeCalendar;
 fn main() {
     let mut sc = UsExchangeCalendar::with_default_rules(false);
     sc.populate_cal(Some(2021), Some(2024));
