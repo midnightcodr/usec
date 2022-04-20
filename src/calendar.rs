@@ -5,6 +5,7 @@
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::env;
 
 /// Specifies the nth week of a month
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
@@ -281,7 +282,7 @@ impl UsExchangeCalendar {
     /// create a new US Exchange calendar with default rules, populate the
     /// calendar with default range (2000-2050) if `populate` is set to `true`
     pub fn with_default_rules(populate: bool) -> UsExchangeCalendar {
-        let holiday_rules = vec![
+        let mut holiday_rules = vec![
             // Saturdays
             Holiday::WeekDay(Weekday::Sat),
             // Sundays
@@ -371,6 +372,11 @@ impl UsExchangeCalendar {
             },
             Holiday::SingularDay(NaiveDate::from_ymd(2001, 9, 11)),
         ];
+        let additional_rules = env::var("ADDITIONAL_RULES");
+        if additional_rules.is_ok() {
+            let mut additional_rules: Vec<Holiday> = serde_json::from_str(&additional_rules.unwrap()).unwrap();
+            holiday_rules.append(&mut additional_rules);
+        }
         let cal = Calendar {
             holidays: BTreeSet::new(),
             halfdays: BTreeSet::new(),

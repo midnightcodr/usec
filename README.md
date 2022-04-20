@@ -17,6 +17,11 @@ I was not satisfied with neither approach due to the requirement of having to in
 
 
 # Example run
-```
+```bash
 cargo run --example show_year 2022
+```
+
+```bash
+# just for the fun, supply JSON formatted env variable to add 3/3/2022 into the rules set
+ADDITIONAL_RULES='[{"SingularDay": "2022-03-03"}]' cargo run --example show_year 2022
 ```
