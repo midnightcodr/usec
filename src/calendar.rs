@@ -627,6 +627,13 @@ mod tests {
     }
 
     #[test]
+    fn test_is_partial_trading_date() {
+        let cal = make_cal();
+        assert_eq!(cal.is_half_holiday(NaiveDate::from_ymd(2021, 11, 26)), true);
+        assert_eq!(cal.is_half_holiday(NaiveDate::from_ymd(2022, 5, 12)), false);
+    }
+
+    #[test]
     fn test_prev_bday() {
         let cal = make_cal();
         assert_eq!(
