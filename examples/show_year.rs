@@ -14,7 +14,7 @@ fn main() {
     } else {
         first
     };
-    let mut usec = UsExchangeCalendar::with_default_rules(false);
+    let mut usec = UsExchangeCalendar::with_default_range(false);
     let usec = usec.populate_cal(Some(first), Some(last));
     let cal = usec.get_cal();
     let mut first_date = NaiveDate::from_ymd(first, 1, 1);

@@ -281,7 +281,7 @@ impl UsExchangeCalendar {
     /// NYSE holiday calendar as of 2022
     /// create a new US Exchange calendar with default rules, populate the
     /// calendar with default range (2000-2050) if `populate` is set to `true`
-    pub fn with_default_rules(populate: bool) -> UsExchangeCalendar {
+    pub fn with_default_range(populate: bool) -> UsExchangeCalendar {
         let mut holiday_rules = vec![
             // Saturdays
             Holiday::WeekDay(Weekday::Sat),
@@ -414,7 +414,7 @@ mod tests {
     use super::*;
 
     fn make_cal() -> Calendar {
-        let usec = UsExchangeCalendar::with_default_rules(true);
+        let usec = UsExchangeCalendar::with_default_range(true);
         usec.get_cal()
     }
 
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn test_usexchange_calendar_empty() {
-        let sc = UsExchangeCalendar::with_default_rules(false);
+        let sc = UsExchangeCalendar::with_default_range(false);
         let c = sc.get_cal();
         assert!(c.holidays.len() == 0);
         assert!(c.halfdays.len() == 0);
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn test_usexchange_calendar_populated() {
-        let sc = UsExchangeCalendar::with_default_rules(true);
+        let sc = UsExchangeCalendar::with_default_range(true);
         let c = sc.get_cal();
         assert!(c.holidays.len() > 0);
         assert!(c.halfdays.len() > 0);
@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn test_usexchange_calendar_with_new_rule() {
         // imaginary holiday, let's call it March Madness Day
-        let mut sc = UsExchangeCalendar::with_default_rules(false);
+        let mut sc = UsExchangeCalendar::with_default_range(false);
         let holiday = Holiday::MonthWeekday {
             month: 3,
             weekday: Weekday::Wed,
