@@ -2,6 +2,11 @@
 name = "usec"
 version = "0.2.0"
 edition = "2021"
+keywords = ["calendar", "financial", "stock-exchange"]
+license = "MIT"
+description = """
+A Rust module with the ability of calculating US stock exchange calendar with full and half-day holidays
+"""
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
