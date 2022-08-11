@@ -16,12 +16,14 @@ pub enum NthWeek {
     Fourth,
     Last,
 }
+/// Do the half-day holiday check before or after the target date
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum HalfCheck {
     Before,
     After,
 }
 
+/// Types of days when US stocks exchanges are closed
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum Holiday {
     /// for US exchanges, `Sat` and `Sun`
@@ -161,7 +163,7 @@ impl Calendar {
     }
 
     /// Calculate the next business day
-    pub fn next_bday(&self, date: NaiveDate) -> NaiveDate {
+    pub fn next_biz_day(&self, date: NaiveDate) -> NaiveDate {
         let mut date = date.succ();
         while !self.is_business_day(date) {
             date = date.succ();
@@ -170,7 +172,7 @@ impl Calendar {
     }
 
     /// Calculate the previous business day
-    pub fn prev_bday(&self, date: NaiveDate) -> NaiveDate {
+    pub fn prev_biz_day(&self, date: NaiveDate) -> NaiveDate {
         let mut date = date.pred();
         while !self.is_business_day(date) {
             date = date.pred();
@@ -227,7 +229,7 @@ pub fn is_leap_year(year: i32) -> bool {
     NaiveDate::from_ymd_opt(year, 2, 29).is_some()
 }
 
-/// Returns accounting period end
+/// Returns ending accounting period (end of month, end of year)
 pub fn accounting_period_end(date: NaiveDate) -> (NaiveDate, NaiveDate) {
     let month = date.month();
     let year = date.year();
@@ -271,6 +273,7 @@ pub fn last_day_of_month(year: i32, month: u32) -> u32 {
         .day()
 }
 
+/// Calendar specific to US stock exchanges
 #[derive(Debug, Clone)]
 pub struct UsExchangeCalendar {
     cal: Calendar,
@@ -634,35 +637,35 @@ mod tests {
     }
 
     #[test]
-    fn test_prev_bday() {
+    fn test_prev_biz_day() {
         let cal = make_cal();
         assert_eq!(
-            cal.prev_bday(NaiveDate::from_ymd(2021, 1, 18)),
+            cal.prev_biz_day(NaiveDate::from_ymd(2021, 1, 18)),
             NaiveDate::from_ymd(2021, 1, 15)
         );
         assert_eq!(
-            cal.prev_bday(NaiveDate::from_ymd(2021, 4, 19)),
+            cal.prev_biz_day(NaiveDate::from_ymd(2021, 4, 19)),
             NaiveDate::from_ymd(2021, 4, 16)
         );
         assert_eq!(
-            cal.prev_bday(NaiveDate::from_ymd(2021, 8, 9)),
+            cal.prev_biz_day(NaiveDate::from_ymd(2021, 8, 9)),
             NaiveDate::from_ymd(2021, 8, 6)
         );
     }
 
     #[test]
-    fn test_next_bday() {
+    fn test_next_biz_day() {
         let cal = make_cal();
         assert_eq!(
-            cal.next_bday(NaiveDate::from_ymd(2021, 4, 16)),
+            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 16)),
             NaiveDate::from_ymd(2021, 4, 19)
         );
         assert_eq!(
-            cal.next_bday(NaiveDate::from_ymd(2021, 4, 19)),
+            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 19)),
             NaiveDate::from_ymd(2021, 4, 20)
         );
         assert_eq!(
-            cal.next_bday(NaiveDate::from_ymd(2021, 4, 2)),
+            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 2)),
             NaiveDate::from_ymd(2021, 4, 5)
         );
     }
