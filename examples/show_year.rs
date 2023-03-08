@@ -17,8 +17,8 @@ fn main() {
     let mut usec = UsExchangeCalendar::with_default_range(false);
     let usec = usec.populate_cal(Some(first), Some(last));
     let cal = usec.get_cal();
-    let mut first_date = NaiveDate::from_ymd(first, 1, 1);
-    let last_date = NaiveDate::from_ymd(last, 12, 31);
+    let mut first_date = NaiveDate::from_ymd_opt(first, 1, 1).unwrap();
+    let last_date = NaiveDate::from_ymd_opt(last, 12, 31).unwrap();
     let mut holidays: Vec<NaiveDate> = Vec::new();
     let mut halfdays: Vec<NaiveDate> = Vec::new();
     while first_date < last_date {

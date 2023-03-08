@@ -94,12 +94,12 @@ impl Calendar {
                 } => {
                     let (first, last) = Self::calc_first_and_last(start, end, first, last);
                     for year in first..last + 1 {
-                        let date = NaiveDate::from_ymd(year, *month, *day);
+                        let date = Calendar::from_ymd(year, *month, *day);
                         // if date falls on Saturday, use Friday, if date falls on Sunday, use Monday
                         let orig_wd = date.weekday();
                         let date = match orig_wd {
-                            Weekday::Sat => date.pred(),
-                            Weekday::Sun => date.succ(),
+                            Weekday::Sat => date.pred_opt().unwrap(),
+                            Weekday::Sun => date.succ_opt().unwrap(),
                             _ => date,
                         };
                         let (last_date_of_month, last_date_of_year) = accounting_period_end(date);
@@ -118,7 +118,7 @@ impl Calendar {
                     let (first, last) = Self::calc_first_and_last(start, end, first, last);
                     for year in first..last + 1 {
                         let easter = computus::gregorian(year).unwrap();
-                        let easter = NaiveDate::from_ymd(easter.year, easter.month, easter.day);
+                        let easter = Calendar::from_ymd(easter.year, easter.month, easter.day);
                         let date = easter
                             .checked_add_signed(Duration::days(*offset as i64))
                             .unwrap();
@@ -142,11 +142,11 @@ impl Calendar {
                             NthWeek::Fourth => 22,
                             NthWeek::Last => last_day_of_month(year, *month),
                         };
-                        let mut date = NaiveDate::from_ymd(year, *month, day);
+                        let mut date = Calendar::from_ymd(year, *month, day);
                         while date.weekday() != *weekday {
                             date = match nth {
-                                NthWeek::Last => date.pred(),
-                                _ => date.succ(),
+                                NthWeek::Last => date.pred_opt().unwrap(),
+                                _ => date.succ_opt().unwrap(),
                             }
                         }
                         holidays.insert(date);
@@ -164,18 +164,18 @@ impl Calendar {
 
     /// Calculate the next business day
     pub fn next_biz_day(&self, date: NaiveDate) -> NaiveDate {
-        let mut date = date.succ();
+        let mut date = date.succ_opt().unwrap();
         while !self.is_business_day(date) {
-            date = date.succ();
+            date = date.succ_opt().unwrap();
         }
         date
     }
 
     /// Calculate the previous business day
     pub fn prev_biz_day(&self, date: NaiveDate) -> NaiveDate {
-        let mut date = date.pred();
+        let mut date = date.pred_opt().unwrap();
         while !self.is_business_day(date) {
-            date = date.pred();
+            date = date.pred_opt().unwrap();
         }
         date
     }
@@ -222,6 +222,10 @@ impl Calendar {
     pub fn is_business_day(&self, date: NaiveDate) -> bool {
         !self.is_weekend(date) && !self.is_holiday(date)
     }
+
+    pub fn from_ymd(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
 }
 
 /// Returns true if the specified year is a leap year (i.e. Feb 29th exists for this year)
@@ -234,8 +238,8 @@ pub fn accounting_period_end(date: NaiveDate) -> (NaiveDate, NaiveDate) {
     let month = date.month();
     let year = date.year();
     let last_date_of_month = NaiveDate::from_ymd_opt(year, month + 1, 1)
-        .unwrap_or_else(|| NaiveDate::from_ymd(year + 1, 1, 1))
-        .pred();
+        .unwrap_or_else(|| Calendar::from_ymd(year + 1, 1, 1))
+        .pred_opt().unwrap();
     let last_date_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
     return (last_date_of_month, last_date_of_year);
 }
@@ -252,14 +256,14 @@ pub fn do_halfday_check(
             if weekday == Weekday::Mon {
                 return;
             }
-            let prior = date.pred();
+            let prior = date.pred_opt().unwrap();
             halfdays.insert(prior);
         }
         Some(HalfCheck::After) => {
             if weekday == Weekday::Fri {
                 return;
             }
-            let next = date.succ();
+            let next = date.succ_opt().unwrap();
             halfdays.insert(next);
         }
     }
@@ -268,8 +272,9 @@ pub fn do_halfday_check(
 /// Calculate the last day of a given month in a given year
 pub fn last_day_of_month(year: i32, month: u32) -> u32 {
     NaiveDate::from_ymd_opt(year, month + 1, 1)
-        .unwrap_or_else(|| NaiveDate::from_ymd(year + 1, 1, 1))
-        .pred()
+        .unwrap_or_else(|| Calendar::from_ymd(year + 1, 1, 1))
+        .pred_opt()
+        .unwrap()
         .day()
 }
 
@@ -373,7 +378,7 @@ impl UsExchangeCalendar {
                 last: None,
                 half_check: Some(HalfCheck::Before),
             },
-            Holiday::SingularDay(NaiveDate::from_ymd(2001, 9, 11)),
+            Holiday::SingularDay(Calendar::from_ymd(2001, 9, 11)),
         ];
         let additional_rules = env::var("ADDITIONAL_RULES");
         if additional_rules.is_ok() {
@@ -424,9 +429,9 @@ mod tests {
     #[test]
     fn fixed_dates_calendar() {
         let holidays = vec![
-            Holiday::SingularDay(NaiveDate::from_ymd(2019, 11, 20)),
-            Holiday::SingularDay(NaiveDate::from_ymd(2019, 11, 24)),
-            Holiday::SingularDay(NaiveDate::from_ymd(2019, 11, 25)),
+            Holiday::SingularDay(Calendar::from_ymd(2019, 11, 20)),
+            Holiday::SingularDay(Calendar::from_ymd(2019, 11, 24)),
+            Holiday::SingularDay(Calendar::from_ymd(2019, 11, 25)),
             Holiday::WeekDay(Weekday::Sat),
             Holiday::WeekDay(Weekday::Sun),
         ];
@@ -434,29 +439,29 @@ mod tests {
 
         assert_eq!(
             false,
-            cal.is_business_day(NaiveDate::from_ymd(2019, 11, 20))
+            cal.is_business_day(Calendar::from_ymd(2019, 11, 20))
         );
-        assert_eq!(true, cal.is_business_day(NaiveDate::from_ymd(2019, 11, 21)));
-        assert_eq!(true, cal.is_business_day(NaiveDate::from_ymd(2019, 11, 22)));
+        assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 21)));
+        assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 22)));
         // weekend
         assert_eq!(
             false,
-            cal.is_business_day(NaiveDate::from_ymd(2019, 11, 23))
+            cal.is_business_day(Calendar::from_ymd(2019, 11, 23))
         );
-        assert_eq!(true, cal.is_weekend(NaiveDate::from_ymd(2019, 11, 23)));
-        assert_eq!(false, cal.is_holiday(NaiveDate::from_ymd(2019, 11, 23)));
+        assert_eq!(true, cal.is_weekend(Calendar::from_ymd(2019, 11, 23)));
+        assert_eq!(false, cal.is_holiday(Calendar::from_ymd(2019, 11, 23)));
         // weekend and holiday
         assert_eq!(
             false,
-            cal.is_business_day(NaiveDate::from_ymd(2019, 11, 24))
+            cal.is_business_day(Calendar::from_ymd(2019, 11, 24))
         );
-        assert_eq!(true, cal.is_weekend(NaiveDate::from_ymd(2019, 11, 24)));
-        assert_eq!(true, cal.is_holiday(NaiveDate::from_ymd(2019, 11, 24)));
+        assert_eq!(true, cal.is_weekend(Calendar::from_ymd(2019, 11, 24)));
+        assert_eq!(true, cal.is_holiday(Calendar::from_ymd(2019, 11, 24)));
         assert_eq!(
             false,
-            cal.is_business_day(NaiveDate::from_ymd(2019, 11, 25))
+            cal.is_business_day(Calendar::from_ymd(2019, 11, 25))
         );
-        assert_eq!(true, cal.is_business_day(NaiveDate::from_ymd(2019, 11, 26)));
+        assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 26)));
     }
 
     #[test]
@@ -469,7 +474,7 @@ mod tests {
             half_check: None,
         }];
         let cal = Calendar::calc_calendar(&holidays, 2021, 2022);
-        assert_eq!(false, cal.is_holiday(NaiveDate::from_ymd(2021, 12, 31)));
+        assert_eq!(false, cal.is_holiday(Calendar::from_ymd(2021, 12, 31)));
     }
 
     #[test]
@@ -481,8 +486,8 @@ mod tests {
             last: None,
         }];
         let cal = Calendar::calc_calendar(&holidays, 2021, 2022);
-        assert_eq!(false, cal.is_business_day(NaiveDate::from_ymd(2021, 4, 2)));
-        assert_eq!(false, cal.is_business_day(NaiveDate::from_ymd(2022, 4, 15)));
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2021, 4, 2)));
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2022, 4, 15)));
     }
 
     #[test]
@@ -508,8 +513,8 @@ mod tests {
             },
         ];
         let cal = Calendar::calc_calendar(&holidays, 2022, 2022);
-        assert_eq!(true, cal.is_holiday(NaiveDate::from_ymd(2022, 1, 17)));
-        assert_eq!(true, cal.is_holiday(NaiveDate::from_ymd(2022, 2, 21)));
+        assert_eq!(true, cal.is_holiday(Calendar::from_ymd(2022, 1, 17)));
+        assert_eq!(true, cal.is_holiday(Calendar::from_ymd(2022, 2, 21)));
     }
 
     #[test]
@@ -531,7 +536,7 @@ mod tests {
                 last: None,
                 half_check: None,
             },
-            Holiday::SingularDay(NaiveDate::from_ymd(2019, 11, 25)),
+            Holiday::SingularDay(Calendar::from_ymd(2019, 11, 25)),
             Holiday::WeekDay(Weekday::Sat),
             Holiday::EasterOffset {
                 offset: -2,
@@ -600,8 +605,8 @@ mod tests {
         assert!(c.holidays.len() > 0);
         assert!(c.halfdays.len() > 0);
         assert!(c.weekdays.len() > 0);
-        assert!(c.is_holiday(NaiveDate::from_ymd(2021, 1, 1)));
-        assert_eq!(false, c.is_holiday(NaiveDate::from_ymd(2021, 12, 31)))
+        assert!(c.is_holiday(Calendar::from_ymd(2021, 1, 1)));
+        assert_eq!(false, c.is_holiday(Calendar::from_ymd(2021, 12, 31)))
     }
 
     #[test]
@@ -618,38 +623,38 @@ mod tests {
         };
         sc.add_holiday_rule(holiday).populate_cal(None, None);
         let c = sc.get_cal();
-        assert_eq!(true, c.is_holiday(NaiveDate::from_ymd(2022, 3, 16)));
+        assert_eq!(true, c.is_holiday(Calendar::from_ymd(2022, 3, 16)));
     }
 
     #[test]
     fn test_is_trading_date() {
         let cal = make_cal();
-        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 4, 18)), false);
-        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 4, 19)), true);
-        assert_eq!(cal.is_business_day(NaiveDate::from_ymd(2021, 1, 1)), false);
+        assert_eq!(cal.is_business_day(Calendar::from_ymd(2021, 4, 18)), false);
+        assert_eq!(cal.is_business_day(Calendar::from_ymd(2021, 4, 19)), true);
+        assert_eq!(cal.is_business_day(Calendar::from_ymd(2021, 1, 1)), false);
     }
 
     #[test]
     fn test_is_partial_trading_date() {
         let cal = make_cal();
-        assert_eq!(cal.is_half_holiday(NaiveDate::from_ymd(2021, 11, 26)), true);
-        assert_eq!(cal.is_half_holiday(NaiveDate::from_ymd(2022, 5, 12)), false);
+        assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2021, 11, 26)), true);
+        assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2022, 5, 12)), false);
     }
 
     #[test]
     fn test_prev_biz_day() {
         let cal = make_cal();
         assert_eq!(
-            cal.prev_biz_day(NaiveDate::from_ymd(2021, 1, 18)),
-            NaiveDate::from_ymd(2021, 1, 15)
+            cal.prev_biz_day(Calendar::from_ymd(2021, 1, 18)),
+            Calendar::from_ymd(2021, 1, 15)
         );
         assert_eq!(
-            cal.prev_biz_day(NaiveDate::from_ymd(2021, 4, 19)),
-            NaiveDate::from_ymd(2021, 4, 16)
+            cal.prev_biz_day(Calendar::from_ymd(2021, 4, 19)),
+            Calendar::from_ymd(2021, 4, 16)
         );
         assert_eq!(
-            cal.prev_biz_day(NaiveDate::from_ymd(2021, 8, 9)),
-            NaiveDate::from_ymd(2021, 8, 6)
+            cal.prev_biz_day(Calendar::from_ymd(2021, 8, 9)),
+            Calendar::from_ymd(2021, 8, 6)
         );
     }
 
@@ -657,16 +662,16 @@ mod tests {
     fn test_next_biz_day() {
         let cal = make_cal();
         assert_eq!(
-            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 16)),
-            NaiveDate::from_ymd(2021, 4, 19)
+            cal.next_biz_day(Calendar::from_ymd(2021, 4, 16)),
+            Calendar::from_ymd(2021, 4, 19)
         );
         assert_eq!(
-            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 19)),
-            NaiveDate::from_ymd(2021, 4, 20)
+            cal.next_biz_day(Calendar::from_ymd(2021, 4, 19)),
+            Calendar::from_ymd(2021, 4, 20)
         );
         assert_eq!(
-            cal.next_biz_day(NaiveDate::from_ymd(2021, 4, 2)),
-            NaiveDate::from_ymd(2021, 4, 5)
+            cal.next_biz_day(Calendar::from_ymd(2021, 4, 2)),
+            Calendar::from_ymd(2021, 4, 5)
         );
     }
 }
