@@ -97,16 +97,25 @@ impl Calendar {
                         let date = Calendar::from_ymd(year, *month, *day);
                         // if date falls on Saturday, use Friday, if date falls on Sunday, use Monday
                         let orig_wd = date.weekday();
+                        let mut moved_already = false;
                         let date = match orig_wd {
-                            Weekday::Sat => date.pred_opt().unwrap(),
-                            Weekday::Sun => date.succ_opt().unwrap(),
+                            Weekday::Sat => {
+                                moved_already = true;
+                                date.pred_opt().unwrap()
+                            }
+                            Weekday::Sun => {
+                                moved_already = true;
+                                date.succ_opt().unwrap()
+                            }
                             _ => date,
                         };
                         let (last_date_of_month, last_date_of_year) = accounting_period_end(date);
                         // use the date only if it's not the end of a month or a year
                         if date != last_date_of_month && date != last_date_of_year {
                             holidays.insert(date);
-                            do_halfday_check(&date, &mut halfdays, half_check);
+                            if !moved_already {
+                                do_halfday_check(&date, &mut halfdays, half_check);
+                            }
                         }
                     }
                 }
@@ -239,7 +248,8 @@ pub fn accounting_period_end(date: NaiveDate) -> (NaiveDate, NaiveDate) {
     let year = date.year();
     let last_date_of_month = NaiveDate::from_ymd_opt(year, month + 1, 1)
         .unwrap_or_else(|| Calendar::from_ymd(year + 1, 1, 1))
-        .pred_opt().unwrap();
+        .pred_opt()
+        .unwrap();
     let last_date_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
     return (last_date_of_month, last_date_of_year);
 }
@@ -382,7 +392,8 @@ impl UsExchangeCalendar {
         ];
         let additional_rules = env::var("ADDITIONAL_RULES");
         if additional_rules.is_ok() {
-            let mut additional_rules: Vec<Holiday> = serde_json::from_str(&additional_rules.unwrap()).unwrap();
+            let mut additional_rules: Vec<Holiday> =
+                serde_json::from_str(&additional_rules.unwrap()).unwrap();
             holiday_rules.append(&mut additional_rules);
         }
         let cal = Calendar {
@@ -437,30 +448,18 @@ mod tests {
         ];
         let cal = Calendar::calc_calendar(&holidays, 2019, 2019);
 
-        assert_eq!(
-            false,
-            cal.is_business_day(Calendar::from_ymd(2019, 11, 20))
-        );
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2019, 11, 20)));
         assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 21)));
         assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 22)));
         // weekend
-        assert_eq!(
-            false,
-            cal.is_business_day(Calendar::from_ymd(2019, 11, 23))
-        );
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2019, 11, 23)));
         assert_eq!(true, cal.is_weekend(Calendar::from_ymd(2019, 11, 23)));
         assert_eq!(false, cal.is_holiday(Calendar::from_ymd(2019, 11, 23)));
         // weekend and holiday
-        assert_eq!(
-            false,
-            cal.is_business_day(Calendar::from_ymd(2019, 11, 24))
-        );
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2019, 11, 24)));
         assert_eq!(true, cal.is_weekend(Calendar::from_ymd(2019, 11, 24)));
         assert_eq!(true, cal.is_holiday(Calendar::from_ymd(2019, 11, 24)));
-        assert_eq!(
-            false,
-            cal.is_business_day(Calendar::from_ymd(2019, 11, 25))
-        );
+        assert_eq!(false, cal.is_business_day(Calendar::from_ymd(2019, 11, 25)));
         assert_eq!(true, cal.is_business_day(Calendar::from_ymd(2019, 11, 26)));
     }
 
@@ -637,6 +636,8 @@ mod tests {
     #[test]
     fn test_is_partial_trading_date() {
         let cal = make_cal();
+        assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2027, 12, 23)), false);
+        assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2026, 7, 2)), false);
         assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2021, 11, 26)), true);
         assert_eq!(cal.is_half_holiday(Calendar::from_ymd(2022, 5, 12)), false);
     }
