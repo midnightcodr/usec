@@ -219,12 +219,12 @@ impl Calendar {
 
     /// Returns true if the specified day is a full-day holiday
     pub fn is_holiday(&self, date: NaiveDate) -> bool {
-        self.holidays.get(&date).is_some()
+        self.holidays.contains(&date)
     }
 
     /// Returns true if the specified day is a half-day holiday
     pub fn is_half_holiday(&self, date: NaiveDate) -> bool {
-        self.halfdays.get(&date).is_some()
+        self.halfdays.contains(&date)
     }
 
     /// Returns true if the specified day is a business day
@@ -251,7 +251,7 @@ pub fn accounting_period_end(date: NaiveDate) -> (NaiveDate, NaiveDate) {
         .pred_opt()
         .unwrap();
     let last_date_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
-    return (last_date_of_month, last_date_of_year);
+    (last_date_of_month, last_date_of_year)
 }
 
 pub fn do_halfday_check(
